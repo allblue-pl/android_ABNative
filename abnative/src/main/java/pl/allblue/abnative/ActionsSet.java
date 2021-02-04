@@ -8,16 +8,10 @@ import java.util.Map;
 public class ActionsSet
 {
 
-    NativeApp nativeApp = null;
-    String name = null;
-
     private Map<String, NativeAction> actions_Native = null;
 
-    public ActionsSet(NativeApp nativeApp, String actionsSetName)
+    public ActionsSet()
     {
-        this.nativeApp = nativeApp;
-        this.name = actionsSetName;
-
         this.actions_Native = new HashMap<>();
     }
 
@@ -26,11 +20,6 @@ public class ActionsSet
         this.actions_Native.put(actionName, action);
 
         return this;
-    }
-
-    public void callWeb(String actionName, JSONObject args, OnWebResultCallback onWebResult)
-    {
-        this.nativeApp.callWeb(this.name, actionName, args, onWebResult);
     }
 
     public NativeAction getNative(String actionName)

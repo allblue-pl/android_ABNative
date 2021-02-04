@@ -33,9 +33,9 @@ public class NativeApp
         webView.addJavascriptInterface(this, "abNative_Android");
     }
 
-    public void addActionsSet(ActionsSet actionsSet)
+    public void addActionsSet(String actionsSetName, ActionsSet actionsSet)
     {
-        this.actionsSets.put(actionsSet.name, actionsSet);
+        this.actionsSets.put(actionsSetName, actionsSet);
     }
 
     public void callWeb(String actionsSetName, String actionName, JSONObject args,
