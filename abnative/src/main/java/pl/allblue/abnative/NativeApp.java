@@ -38,18 +38,25 @@ public class NativeApp
         this.actionsSets.put(actionsSetName, actionsSet);
     }
 
-    public void callWeb(String actionsSetName, String actionName, JSONObject args,
-            OnWebResultCallback onWebResultCallback)
+    public void callWeb(final String actionsSetName, final String actionName,
+            final JSONObject args, OnWebResultCallback onWebResultCallback)
     {
-        int actionId = ++this.web_ActionId_Last;
+        final NativeApp self = this;
+
+        final int actionId = ++this.web_ActionId_Last;
         this.onWebResultInfos.put(actionId, new OnWebResultInfo(onWebResultCallback));
 
-        this.webView.evaluateJavascript("abNative.callWeb(" +
-                Integer.toString(actionId) + ", \"" + actionsSetName + "\", \"" +
-                actionName + "\", " + args.toString() + ")", new ValueCallback<String>() {
+        this.webView.post(new Runnable() {
             @Override
-            public void onReceiveValue(String s) {
-                // Do nothing. Maybe check for success in the future.
+            public void run() {
+                self.webView.evaluateJavascript("abNative.callWeb(" +
+                        Integer.toString(actionId) + ", \"" + actionsSetName + "\", \"" +
+                        actionName + "\", " + args.toString() + ")", new ValueCallback<String>() {
+                    @Override
+                    public void onReceiveValue(String s) {
+                        // Do nothing. Maybe check for success in the future.
+                    }
+                });
             }
         });
     }
