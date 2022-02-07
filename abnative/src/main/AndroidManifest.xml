@@ -1,2 +1,6 @@
 <manifest xmlns:android="http://schemas.android.com/apk/res/android"
-        package="pl.allblue.abnative" />
+        package="pl.allblue.abnative">
+
+    <application>
+    </application>
+</manifest>
