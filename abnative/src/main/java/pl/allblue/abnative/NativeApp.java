@@ -157,8 +157,14 @@ public class NativeApp
         }
 
         OnWebResultInfo onWebResultInfo = this.onWebResultInfos.get(actionId);
-        if (onWebResultInfo.callback != null)
-            onWebResultInfo.callback.call(result);
+        if (onWebResultInfo.callback != null) {
+            try {
+                onWebResultInfo.callback.call(result);
+            } catch (JSONException e) {
+                Log.e("NativeApp", "Cannot read json result.", e);
+                return;
+            }
+        }
         this.onWebResultInfos.remove(actionId);
     }
 
