@@ -1,21 +1,97 @@
 package pl.allblue.abnative;
 
+import android.content.Context;
+import android.os.Build;
 import android.os.Handler;
 import android.os.Looper;
 import android.util.ArrayMap;
 import android.util.Log;
+import android.view.View;
 import android.webkit.JavascriptInterface;
 import android.webkit.ValueCallback;
+import android.webkit.WebSettings;
 import android.webkit.WebView;
+import android.webkit.WebViewClient;
 
 import org.json.JSONException;
 import org.json.JSONObject;
 
+import java.io.BufferedReader;
+import java.io.IOException;
+import java.io.InputStream;
+import java.io.InputStreamReader;
+import java.lang.annotation.Native;
 import java.util.HashMap;
 import java.util.Map;
 
 public class NativeApp
 {
+
+    static public void InitWebView(Context context, WebView webView, String devUri,
+            boolean debug)
+    {
+        if (debug) {
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.KITKAT)
+                WebView.setWebContentsDebuggingEnabled(true);
+        }
+
+        WebViewClient webClient = new WebViewClient();
+        webView.setWebViewClient(webClient);
+
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.KITKAT)
+            webView.setLayerType(View.LAYER_TYPE_HARDWARE, null);
+        else
+            webView.setLayerType(View.LAYER_TYPE_SOFTWARE, null);
+
+        webView.getSettings().setCacheMode(WebSettings.LOAD_NO_CACHE);
+        webView.getSettings().setJavaScriptEnabled(true);
+        webView.getSettings().setMediaPlaybackRequiresUserGesture(false);
+
+        if (devUri != null) {
+            Log.d("NativeApp", "Debugging on: " + devUri);
+            webView.clearCache(true);
+            webView.loadUrl("http://" + devUri);
+        } else {
+            webView.clearCache(false);
+
+            String header = NativeApp.GetStringFromFile(context,
+                    "web-app/cache/abWeb/web/header.html");
+            String postBodyInit = NativeApp.GetStringFromFile(context,
+                    "web-app/cache/abWeb/web/postBodyInit.html");
+
+            String debug_Str = debug ? "true" : "false";
+
+            String index = NativeApp.GetStringFromFile(context,
+              "web-app/index.base.html")
+                    .replace("{{header}}", header)
+                    .replace("{{postBodyInit}}", postBodyInit)
+                    .replace("{{base}}", "/android_asset/web-app/")
+                    .replace("{{debug}}", debug_Str);
+
+            webView.loadDataWithBaseURL("file:///android_asset/web-app/",
+                    index, "text/html", "UTF-8",
+                    "/android_asset/web-app/");
+        }
+    }
+
+    static private String GetStringFromFile(Context context, String assetFilePath)
+    {
+        try {
+            InputStream is = context.getAssets().open(assetFilePath);
+            BufferedReader reader = new BufferedReader(new InputStreamReader(is));
+            StringBuilder sb = new StringBuilder();
+            String line = null;
+            while ((line = reader.readLine()) != null) {
+                sb.append(line).append("\n");
+            }
+            reader.close();
+
+            return sb.toString();
+        } catch (IOException e) {
+            throw new AssertionError(e);
+        }
+    }
+
 
     private WebView webView = null;
     private Map<String, ActionsSet> actionsSets = new HashMap<>();
@@ -102,7 +178,7 @@ public class NativeApp
         if (actionsSet == null) {
             Log.e("NativeApp", "ActionsSet '" + actionsSetName +
                     "' does not exist.");
-            this.errorNative("ActionsSet '" + actionsSetName + "' does not exist.");
+            this.errorNative("ActionsSet '" + actionsSetName + "' not implemented.");
             return;
         }
         NativeAction action = actionsSet.getNative(actionName);
