@@ -21,8 +21,14 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.io.InputStreamReader;
 import java.lang.annotation.Native;
+import java.util.ArrayList;
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
+import java.util.concurrent.TimeUnit;
+import java.util.concurrent.locks.Condition;
+import java.util.concurrent.locks.Lock;
+import java.util.concurrent.locks.ReentrantLock;
 
 public class NativeApp
 {
@@ -92,12 +98,17 @@ public class NativeApp
         }
     }
 
+    private Lock lock = new ReentrantLock();
 
     private WebView webView = null;
+    private boolean initialized = false;
     private Map<String, ActionsSet> actionsSets = new HashMap<>();
     private Map<Integer, OnWebResultInfo> onWebResultInfos = new ArrayMap<>();
 
     private int web_ActionId_Last = 0;
+
+    private ArrayList<WebCall> webView_Init_WebCalls = new ArrayList<>();
+    private boolean webView_Initialized = false;
 
     public NativeApp(WebView webView)
     {
@@ -105,18 +116,38 @@ public class NativeApp
 
         this.web_ActionId_Last = 0;
 //        this.onWebResultInfos = ;
-
-        webView.addJavascriptInterface(this, "abNative_Android");
     }
 
     public void addActionsSet(String actionsSetName, ActionsSet actionsSet)
     {
+        this.lock.lock();
+
+        if (this.initialized) {
+            throw new AssertionError(
+                    "Cannot add action set after initialization.");
+        }
+
+        this.lock.unlock();
+
         this.actionsSets.put(actionsSetName, actionsSet);
     }
 
     public void callWeb(final String actionsSetName, final String actionName,
             final JSONObject args, OnWebResultCallback onWebResultCallback)
     {
+        this.lock.lock();
+
+        if (!this.webView_Initialized) {
+            Log.d("NativeApp", "Adding action to stack.");
+
+            this.webView_Init_WebCalls.add(new WebCall(actionsSetName, actionName, args,
+                    onWebResultCallback));
+            this.lock.unlock();
+            return;
+        }
+
+        this.lock.unlock();
+
         final NativeApp self = this;
 
         final int actionId = ++this.web_ActionId_Last;
@@ -158,6 +189,15 @@ public class NativeApp
     public ActionsSet getActionsSet(String actionsSetName)
     {
         return this.actionsSets.get(actionsSetName);
+    }
+
+    public void init()
+    {
+        this.lock.lock();
+        this.initialized = true;
+        this.lock.unlock();
+
+        this.webView.addJavascriptInterface(this, "abNative_Android");
     }
 
 
@@ -242,6 +282,48 @@ public class NativeApp
             }
         }
         this.onWebResultInfos.remove(actionId);
+    }
+
+    @JavascriptInterface
+    public void webViewInitialized()
+    {
+        Log.d("NativeApp", "Web view initialized.");
+
+        this.lock.lock();
+
+        this.webView_Initialized = true;
+
+        this.lock.unlock();
+
+        Log.d("NativeApp", "Calling action stack: " +
+                this.webView_Init_WebCalls.size());
+
+        for (int i = 0; i < this.webView_Init_WebCalls.size(); i++) {
+            WebCall wc = this.webView_Init_WebCalls.get(i);
+
+            this.callWeb(wc.actionsSetName, wc.actionName, wc.args,
+                    wc.onWebResultCallback);
+        }
+    }
+
+
+    private class WebCall
+    {
+
+        public String actionsSetName = null;
+        public String actionName = null;
+        public JSONObject args;
+        public OnWebResultCallback onWebResultCallback;
+
+        public WebCall(String actionsSetName, String actionName, JSONObject args,
+                       OnWebResultCallback onWebResultCallback)
+        {
+            this.actionsSetName = actionsSetName;
+            this.actionName = actionName;
+            this.args = args;
+            this.onWebResultCallback = onWebResultCallback;
+        }
+
     }
 
 }
