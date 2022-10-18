@@ -153,18 +153,16 @@ public class NativeApp
         final int actionId = ++this.web_ActionId_Last;
         this.onWebResultInfos.put(actionId, new OnWebResultInfo(onWebResultCallback));
 
-        this.webView.post(new Runnable() {
-            @Override
-            public void run() {
-                self.webView.evaluateJavascript("abNative.callWeb(" +
-                        Integer.toString(actionId) + ", \"" + actionsSetName + "\", \"" +
-                        actionName + "\", " + args.toString() + ")", new ValueCallback<String>() {
-                    @Override
-                    public void onReceiveValue(String s) {
-                        // Do nothing. Maybe check for success in the future.
-                    }
-                });
-            }
+        this.webView.post(() -> {
+            String args_Str = args == null ? "null" : args.toString();
+            self.webView.evaluateJavascript("abNative.callWeb(" +
+                    Integer.toString(actionId) + ", \"" + actionsSetName + "\", \"" +
+                    actionName + "\", " + args_Str + ")", new ValueCallback<String>() {
+                @Override
+                public void onReceiveValue(String s) {
+                    // Do nothing. Maybe check for success in the future.
+                }
+            });
         });
     }
 
@@ -206,12 +204,14 @@ public class NativeApp
             String argsString)
     {
         JSONObject args = null;
-        try {
-            args = new JSONObject(argsString);
-        } catch (JSONException e) {
-            Log.e("NativeApp", "Cannot parse 'argString'.", e);
-            this.errorNative("Cannot parser 'argString': " + e.getMessage());
-            return;
+        if (argsString != null) {
+            try {
+                args = new JSONObject(argsString);
+            } catch (JSONException e) {
+                Log.e("NativeApp", "Cannot parse 'argString'.", e);
+                this.errorNative("Cannot parser 'argString': " + e.getMessage());
+                return;
+            }
         }
 
         ActionsSet actionsSet = this.getActionsSet(actionsSetName);
@@ -263,6 +263,9 @@ public class NativeApp
     @JavascriptInterface
     public void onWebResult(int actionId, String resultString)
     {
+        Log.d("NewTest", "Result: " + (resultString == null ?
+                "NULL" : resultString));
+
         JSONObject result = null;
         try {
             if (resultString != null)
