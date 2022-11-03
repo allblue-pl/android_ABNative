@@ -263,9 +263,6 @@ public class NativeApp
     @JavascriptInterface
     public void onWebResult(int actionId, String resultString)
     {
-        Log.d("NewTest", "Result: " + (resultString == null ?
-                "NULL" : resultString));
-
         JSONObject result = null;
         try {
             if (resultString != null)
