@@ -138,8 +138,6 @@ public class NativeApp
         this.lock.lock();
 
         if (!this.webView_Initialized) {
-            Log.d("NativeApp", "Adding action to stack.");
-
             this.webView_Init_WebCalls.add(new WebCall(actionsSetName, actionName, args,
                     onWebResultCallback));
             this.lock.unlock();
