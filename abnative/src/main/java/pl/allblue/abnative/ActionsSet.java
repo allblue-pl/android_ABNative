@@ -1,6 +1,6 @@
 package pl.allblue.abnative;
 
-import org.json.JSONObject;
+import android.util.Pair;
 
 import java.util.HashMap;
 import java.util.Map;
@@ -8,7 +8,7 @@ import java.util.Map;
 public class ActionsSet
 {
 
-    private Map<String, NativeAction> actions_Native = null;
+    private Map<String, Pair<NativeAction, NativeActionCallback>> actions_Native = null;
 
     public ActionsSet()
     {
@@ -17,12 +17,20 @@ public class ActionsSet
 
     public ActionsSet addNative(String actionName, NativeAction action)
     {
-        this.actions_Native.put(actionName, action);
+        this.actions_Native.put(actionName, new Pair(action, null));
 
         return this;
     }
 
-    public NativeAction getNative(String actionName)
+    public ActionsSet addNativeCallback(String actionName,
+            NativeActionCallback actionCallback)
+    {
+        this.actions_Native.put(actionName, new Pair(null, actionCallback));
+
+        return this;
+    }
+
+    public Pair<NativeAction, NativeActionCallback> getNative(String actionName)
     {
         return this.actions_Native.get(actionName);
     }

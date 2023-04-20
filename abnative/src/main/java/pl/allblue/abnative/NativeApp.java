@@ -3,9 +3,11 @@ package pl.allblue.abnative;
 import android.content.Context;
 import android.os.Build;
 import android.os.Handler;
+import android.os.HandlerThread;
 import android.os.Looper;
 import android.util.ArrayMap;
 import android.util.Log;
+import android.util.Pair;
 import android.view.View;
 import android.webkit.JavascriptInterface;
 import android.webkit.ValueCallback;
@@ -23,61 +25,82 @@ import java.io.InputStreamReader;
 import java.lang.annotation.Native;
 import java.util.ArrayList;
 import java.util.HashMap;
-import java.util.List;
 import java.util.Map;
-import java.util.concurrent.TimeUnit;
-import java.util.concurrent.locks.Condition;
 import java.util.concurrent.locks.Lock;
 import java.util.concurrent.locks.ReentrantLock;
 
 public class NativeApp
 {
 
-    static public void InitWebView(Context context, WebView webView, String devUri,
-            boolean debug)
+    static private Handler CallHandler = null;
+//    static private HandlerThread CallHandler_Thread = null;
+
+
+    static public Handler GetCallHandler()
     {
-        if (debug) {
+        if (NativeApp.CallHandler == null) {
+//            NativeApp.CallHandler_Thread = new HandlerThread("NativeApp");
+//            NativeApp.CallHandler_Thread.start();
+//            NativeApp.CallHandler = new Handler(
+//                    NativeApp.CallHandler_Thread.getLooper());
+
+            NativeApp.CallHandler = new Handler(Looper.getMainLooper());
+        }
+
+        return NativeApp.CallHandler;
+    }
+
+    static public void InitWebView(Context context, WebView webView,
+            String devUri, boolean debug,
+            AfterInitWebViewCallback afterInitWebViewCallback)
+    {
+        NativeApp.GetCallHandler().post(() -> {
+            if (debug) {
+                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.KITKAT)
+                    WebView.setWebContentsDebuggingEnabled(true);
+            }
+
+            WebViewClient webClient = new WebViewClient();
+            webView.setWebViewClient(webClient);
+
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.KITKAT)
-                WebView.setWebContentsDebuggingEnabled(true);
-        }
+                webView.setLayerType(View.LAYER_TYPE_HARDWARE, null);
+            else
+                webView.setLayerType(View.LAYER_TYPE_SOFTWARE, null);
 
-        WebViewClient webClient = new WebViewClient();
-        webView.setWebViewClient(webClient);
+            webView.getSettings().setCacheMode(WebSettings.LOAD_NO_CACHE);
+            webView.getSettings().setJavaScriptEnabled(true);
+            webView.getSettings().setMediaPlaybackRequiresUserGesture(false);
 
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.KITKAT)
-            webView.setLayerType(View.LAYER_TYPE_HARDWARE, null);
-        else
-            webView.setLayerType(View.LAYER_TYPE_SOFTWARE, null);
+            if (devUri != null) {
+                Log.d("NativeApp", "Debugging on: " + devUri);
+                webView.clearCache(true);
+                webView.loadUrl("http://" + devUri);
+            } else {
+                webView.clearCache(false);
 
-        webView.getSettings().setCacheMode(WebSettings.LOAD_NO_CACHE);
-        webView.getSettings().setJavaScriptEnabled(true);
-        webView.getSettings().setMediaPlaybackRequiresUserGesture(false);
+                String header = NativeApp.GetStringFromFile(context,
+                        "web-app/cache/abWeb/web/header.html");
+                String postBodyInit = NativeApp.GetStringFromFile(context,
+                        "web-app/cache/abWeb/web/postBodyInit.html");
 
-        if (devUri != null) {
-            Log.d("NativeApp", "Debugging on: " + devUri);
-            webView.clearCache(true);
-            webView.loadUrl("http://" + devUri);
-        } else {
-            webView.clearCache(false);
+                String debug_Str = debug ? "true" : "false";
 
-            String header = NativeApp.GetStringFromFile(context,
-                    "web-app/cache/abWeb/web/header.html");
-            String postBodyInit = NativeApp.GetStringFromFile(context,
-                    "web-app/cache/abWeb/web/postBodyInit.html");
+                String index = NativeApp.GetStringFromFile(context,
+                                "web-app/index.base.html")
+                        .replace("{{header}}", header)
+                        .replace("{{postBodyInit}}", postBodyInit)
+                        .replace("{{base}}", "/android_asset/web-app/")
+                        .replace("{{debug}}", debug_Str);
 
-            String debug_Str = debug ? "true" : "false";
+                webView.loadDataWithBaseURL("file:///android_asset/web-app/",
+                        index, "text/html", "UTF-8",
+                        "/android_asset/web-app/");
+            }
 
-            String index = NativeApp.GetStringFromFile(context,
-              "web-app/index.base.html")
-                    .replace("{{header}}", header)
-                    .replace("{{postBodyInit}}", postBodyInit)
-                    .replace("{{base}}", "/android_asset/web-app/")
-                    .replace("{{debug}}", debug_Str);
-
-            webView.loadDataWithBaseURL("file:///android_asset/web-app/",
-                    index, "text/html", "UTF-8",
-                    "/android_asset/web-app/");
-        }
+            if (afterInitWebViewCallback != null)
+                afterInitWebViewCallback.afterInitWebView();
+        });
     }
 
     static private String GetStringFromFile(Context context, String assetFilePath)
@@ -99,6 +122,9 @@ public class NativeApp
     }
 
     private Lock lock = new ReentrantLock();
+
+    private HandlerThread handler_Thread = null;
+    private Handler handler = null;
 
     private WebView webView = null;
     private boolean initialized = false;
@@ -135,50 +161,48 @@ public class NativeApp
     public void callWeb(final String actionsSetName, final String actionName,
             final JSONObject args, OnWebResultCallback onWebResultCallback)
     {
-        this.lock.lock();
+        NativeApp.GetCallHandler().post(() -> {
+            this.lock.lock();
 
-        if (!this.webView_Initialized) {
-            this.webView_Init_WebCalls.add(new WebCall(actionsSetName, actionName, args,
-                    onWebResultCallback));
+            if (!this.webView_Initialized) {
+                Log.d("NativeApp", "Adding action to stack.");
+
+                this.webView_Init_WebCalls.add(new WebCall(actionsSetName, actionName, args,
+                        onWebResultCallback));
+                this.lock.unlock();
+                return;
+            }
+
             this.lock.unlock();
-            return;
-        }
 
-        this.lock.unlock();
+            final NativeApp self = this;
 
-        final NativeApp self = this;
+            final int actionId = ++this.web_ActionId_Last;
+            this.onWebResultInfos.put(actionId,
+                    new OnWebResultInfo(onWebResultCallback));
 
-        final int actionId = ++this.web_ActionId_Last;
-        this.onWebResultInfos.put(actionId, new OnWebResultInfo(onWebResultCallback));
 
-        this.webView.post(() -> {
-            String args_Str = args == null ? "null" : args.toString();
-            self.webView.evaluateJavascript("abNative.callWeb(" +
-                    Integer.toString(actionId) + ", \"" + actionsSetName + "\", \"" +
-                    actionName + "\", " + args_Str + ")", new ValueCallback<String>() {
-                @Override
-                public void onReceiveValue(String s) {
-                    // Do nothing. Maybe check for success in the future.
-                }
+            this.webView.post(() -> {
+                String args_Str = args == null ? "null" : args.toString();
+                self.webView.evaluateJavascript("abNative.callWeb(" +
+                        Integer.toString(actionId) + ", \"" + actionsSetName + "\", \"" +
+                        actionName + "\", " + args_Str + ")", new ValueCallback<String>() {
+                    @Override
+                    public void onReceiveValue(String s) {
+                        // Do nothing. Maybe check for success in the future.
+                    }
+                });
             });
         });
     }
 
     public void errorNative(final String message)
     {
-        final WebView webView = this.webView;
-        Handler handler = new Handler(Looper.getMainLooper());
-        handler.post(new Runnable() {
-            @Override
-            public void run() {
-                webView.evaluateJavascript("abNative.errorNative(\"" + message + "\")",
-                        new ValueCallback<String>() {
-                    @Override
-                    public void onReceiveValue(String s) {
-                        // Do nothing. Maybe check for success in the future.
-                    }
-                });
-            }
+        NativeApp.GetCallHandler().post(() -> {
+            this.webView.evaluateJavascript("abNative.errorNative(\"" +
+                    message + "\")", (String s) -> {
+                // Do nothing. Maybe check for success in the future.
+            });
         });
     }
 
@@ -189,11 +213,14 @@ public class NativeApp
 
     public void init()
     {
-        this.lock.lock();
-        this.initialized = true;
-        this.lock.unlock();
+        NativeApp.GetCallHandler().post(() -> {
+            this.lock.lock();
+            this.initialized = true;
 
-        this.webView.addJavascriptInterface(this, "abNative_Android");
+            this.webView.addJavascriptInterface(this, "abNative_Android");
+
+            this.lock.unlock();
+        });
     }
 
 
@@ -201,6 +228,8 @@ public class NativeApp
     public void callNative(final int actionId, String actionsSetName, String actionName,
             String argsString)
     {
+        final NativeApp self = this;
+
         JSONObject args = null;
         if (argsString != null) {
             try {
@@ -219,9 +248,10 @@ public class NativeApp
             this.errorNative("ActionsSet '" + actionsSetName + "' not implemented.");
             return;
         }
-        NativeAction action = actionsSet.getNative(actionName);
+        Pair<NativeAction, NativeActionCallback> actionPair =
+                actionsSet.getNative(actionName);
 
-        if (action == null) {
+        if (actionPair == null) {
             Log.e("NativeApp", "Action '" + actionsSetName + ":" +
                     actionName + " not implemented.");
             this.errorNative("Action '" + actionsSetName + ":" +
@@ -229,33 +259,64 @@ public class NativeApp
             return;
         }
 
-        final JSONObject result;
-        try {
-            result = action.call(args);
-        } catch (JSONException e) {
-            Log.e("NativeApp", "JSONException when calling '" +
-                    actionsSetName + ":" + actionName + ".", e);
-            this.errorNative("JSONException when calling '" + actionsSetName + ":" + actionName + ".");
-            return;
-        }
+        /* Action Call */
+        if (actionPair.first != null) {
+            final JSONObject result;
+            try {
+                result = actionPair.first.call(args);
+            } catch (Exception e) {
+                Log.e("NativeApp", "JSONException when calling '" +
+                        actionsSetName + ":" + actionName + ".", e);
+                this.errorNative("JSONException when calling '" + actionsSetName + ":" + actionName + ".");
+                return;
+            }
 
-        final WebView webView = this.webView;
-        Handler handler = new Handler(Looper.getMainLooper());
-        handler.post(new Runnable() {
-            @Override
-            public void run() {
-                String result_String = result == null ? "null" : result.toString();
+           NativeApp.GetCallHandler().post(() -> {
+                String result_String = result == null ?
+                        "null" : result.toString();
 
-                webView.evaluateJavascript("abNative.onNativeResult(" +
-                        actionId + "," + result_String + ")",
-                        new ValueCallback<String>() {
+                this.webView.evaluateJavascript("abNative.onNativeResult(" +
+                        actionId + "," + result_String + ")", (String s) -> {
+                    // Do nothing. Maybe check for success in the future.
+                });
+            });
+        /* Action Callback */
+        } else if (actionPair.second != null) {
+            try {
+                actionPair.second.call(args, new ActionResultCallback() {
                     @Override
-                    public void onReceiveValue(String s) {
-                        // Do nothing. Maybe check for success in the future.
+                    public void onResult(JSONObject result) {
+                        NativeApp.GetCallHandler().post(() -> {
+                            String result_String = result == null ?
+                                    "null" : result.toString();
+
+                            self.webView.evaluateJavascript(
+                                    "abNative.onNativeResult(" +
+                                    actionId + "," + result_String + ")",
+                                    (String s) -> {
+                                // Do nothing. Maybe check for success in the future.
+                            });
+                        });
+                    }
+
+                    @Override
+                    public void onError(Exception e) {
+                        Log.e("NativeApp", "Exception when calling '" +
+                                actionsSetName + ":" + actionName + ".", e);
+                        self.errorNative("Exception when calling '" + actionsSetName +
+                                ":" + actionName + ".");
                     }
                 });
+            } catch (Exception e) {
+                Log.e("NativeApp", "Exception when calling '" +
+                        actionsSetName + ":" + actionName + ".", e);
+                this.errorNative("Exception when calling '" + actionsSetName +
+                        ":" + actionName + ".");
+                return;
             }
-        });
+        } else {
+            throw new AssertionError("Action pair os empty.");
+        }
     }
 
     @JavascriptInterface
@@ -302,6 +363,12 @@ public class NativeApp
             this.callWeb(wc.actionsSetName, wc.actionName, wc.args,
                     wc.onWebResultCallback);
         }
+    }
+
+
+    public interface AfterInitWebViewCallback
+    {
+        void afterInitWebView();
     }
 
 
