@@ -93,6 +93,8 @@ public class NativeApp
                         .replace("{{base}}", "/android_asset/web-app/")
                         .replace("{{debug}}", debug_Str);
 
+                Log.d("Testing", index);
+
                 webView.loadDataWithBaseURL("file:///android_asset/web-app/",
                         index, "text/html", "UTF-8",
                         "/android_asset/web-app/");
