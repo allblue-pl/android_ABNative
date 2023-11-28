@@ -1,5 +1,6 @@
 package pl.allblue.abnative;
 
+import android.app.Activity;
 import android.content.Context;
 import android.os.Build;
 import android.os.Handler;
@@ -48,61 +49,6 @@ public class NativeApp
         }
 
         return NativeApp.CallHandler;
-    }
-
-    static public void InitWebView(Context context, WebView webView,
-            String devUri, boolean debug,
-            AfterInitWebViewCallback afterInitWebViewCallback)
-    {
-        NativeApp.GetCallHandler().post(() -> {
-            if (debug) {
-                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.KITKAT)
-                    WebView.setWebContentsDebuggingEnabled(true);
-            }
-
-            WebViewClient webClient = new WebViewClient();
-            webView.setWebViewClient(webClient);
-
-            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.KITKAT)
-                webView.setLayerType(View.LAYER_TYPE_HARDWARE, null);
-            else
-                webView.setLayerType(View.LAYER_TYPE_SOFTWARE, null);
-
-            webView.getSettings().setCacheMode(WebSettings.LOAD_NO_CACHE);
-            webView.getSettings().setJavaScriptEnabled(true);
-            webView.getSettings().setMediaPlaybackRequiresUserGesture(false);
-
-            if (devUri != null) {
-                Log.d("NativeApp", "Debugging on: " + devUri);
-                webView.clearCache(true);
-                webView.loadUrl("http://" + devUri);
-            } else {
-                webView.clearCache(false);
-
-                String header = NativeApp.GetStringFromFile(context,
-                        "web-app/cache/abWeb/web/header.html");
-                String postBodyInit = NativeApp.GetStringFromFile(context,
-                        "web-app/cache/abWeb/web/postBodyInit.html");
-
-                String debug_Str = debug ? "true" : "false";
-
-                String index = NativeApp.GetStringFromFile(context,
-                                "web-app/index.base.html")
-                        .replace("{{header}}", header)
-                        .replace("{{postBodyInit}}", postBodyInit)
-                        .replace("{{base}}", "/android_asset/web-app/")
-                        .replace("{{debug}}", debug_Str);
-
-                Log.d("Testing", index);
-
-                webView.loadDataWithBaseURL("file:///android_asset/web-app/",
-                        index, "text/html", "UTF-8",
-                        "/android_asset/web-app/");
-            }
-
-            if (afterInitWebViewCallback != null)
-                afterInitWebViewCallback.afterInitWebView();
-        });
     }
 
     static private String GetStringFromFile(Context context, String assetFilePath)
@@ -213,8 +159,7 @@ public class NativeApp
         return this.actionsSets.get(actionsSetName);
     }
 
-    public void init()
-    {
+    public void init() {
         NativeApp.GetCallHandler().post(() -> {
             this.lock.lock();
             this.initialized = true;
@@ -225,6 +170,70 @@ public class NativeApp
         });
     }
 
+    public void loadWebView(Activity context, WebView webView,
+            String devUri, boolean debug,
+            AfterInitWebViewCallback afterInitWebViewCallback)
+    {
+        NativeApp.GetCallHandler().post(() -> {
+            this.lock.lock();
+
+//            context.runOnUiThread(() -> {
+
+                if (debug) {
+                    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.KITKAT)
+                        WebView.setWebContentsDebuggingEnabled(true);
+                }
+
+                WebViewClient webClient = new WebViewClient();
+                webView.setWebViewClient(webClient);
+
+                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.KITKAT)
+                    webView.setLayerType(View.LAYER_TYPE_HARDWARE, null);
+                else
+                    webView.setLayerType(View.LAYER_TYPE_SOFTWARE, null);
+
+                webView.getSettings().setCacheMode(WebSettings.LOAD_NO_CACHE);
+                webView.getSettings().setJavaScriptEnabled(true);
+                webView.getSettings().setMediaPlaybackRequiresUserGesture(false);
+
+                if (devUri != null) {
+                    Log.d("NativeApp", "Debugging on: " + devUri);
+                    webView.clearCache(true);
+                    webView.loadUrl(devUri);
+                } else {
+                    webView.clearCache(false);
+
+                    String header = NativeApp.GetStringFromFile(context,
+                            "web-app/cache/abWeb/web/header.html");
+                    header += "\r\n" + NativeApp.GetStringFromFile(context,
+                            "web-app/cache/abWeb/web/header_Scripts.html");
+                    String postBody = NativeApp.GetStringFromFile(context,
+                            "web-app/cache/abWeb/web/postBody.html");
+                    postBody += "\r\n" + NativeApp.GetStringFromFile(context,
+                            "web-app/cache/abWeb/web/postBody_Scripts.html");
+
+                    String debug_Str = debug ? "true" : "false";
+
+                    String index = NativeApp.GetStringFromFile(context,
+                                    "web-app/index.base.html")
+                            .replace("{{header}}", header)
+                            .replace("{{postBody}}", postBody)
+                            .replace("{{base}}", "/android_asset/web-app/")
+                            .replace("{{debug}}", debug_Str);
+
+                    webView.loadDataWithBaseURL("file:///android_asset/web-app/",
+                            index, "text/html", "UTF-8",
+                            "/android_asset/web-app/");
+                }
+
+                if (afterInitWebViewCallback != null)
+                    afterInitWebViewCallback.afterInitWebView();
+
+            this.lock.unlock();
+
+//            });
+        });
+    }
 
     @JavascriptInterface
     public void callNative(final int actionId, String actionsSetName, String actionName,
