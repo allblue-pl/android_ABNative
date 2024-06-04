@@ -171,7 +171,7 @@ public class NativeApp
     }
 
     public void loadWebView(Activity context, WebView webView,
-            String devUri, boolean debug,
+            String devUri, String extraUri, boolean debug,
             AfterInitWebViewCallback afterInitWebViewCallback)
     {
         NativeApp.GetCallHandler().post(() -> {
@@ -199,7 +199,7 @@ public class NativeApp
                 if (devUri != null) {
                     Log.d("NativeApp", "Debugging on: " + devUri);
                     webView.clearCache(true);
-                    webView.loadUrl(devUri);
+                    webView.loadUrl(devUri + extraUri);
                 } else {
                     webView.clearCache(false);
 
@@ -218,12 +218,15 @@ public class NativeApp
                                     "web-app/index.base.html")
                             .replace("{{header}}", header)
                             .replace("{{postBody}}", postBody)
-                            .replace("{{base}}", "/android_asset/web-app/")
+                            .replace("{{base}}",
+                                    "/android_asset/web-app/")
                             .replace("{{debug}}", debug_Str);
 
-                    webView.loadDataWithBaseURL("file:///android_asset/web-app/",
-                            index, "text/html", "UTF-8",
-                            "/android_asset/web-app/");
+                    webView.loadDataWithBaseURL(
+                            "file:///android_asset/web-app/zaswiadczenia/" +
+                            extraUri, index, "text/html",
+                            "UTF-8",
+                            "/android_asset/web-app/" + extraUri);
                 }
 
                 if (afterInitWebViewCallback != null)
