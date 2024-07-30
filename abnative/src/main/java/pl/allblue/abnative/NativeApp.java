@@ -84,10 +84,8 @@ public class NativeApp
     private ArrayList<WebCall> webView_Init_WebCalls = new ArrayList<>();
     private boolean webView_Initialized = false;
 
-    public NativeApp(WebView webView)
+    public NativeApp()
     {
-        this.webView = webView;
-
         this.web_ActionId_Last = 0;
 //        this.onWebResultInfos = ;
     }
@@ -176,6 +174,8 @@ public class NativeApp
     {
         NativeApp.GetCallHandler().post(() -> {
             this.lock.lock();
+
+            this.webView = webView;
 
 //            context.runOnUiThread(() -> {
 
