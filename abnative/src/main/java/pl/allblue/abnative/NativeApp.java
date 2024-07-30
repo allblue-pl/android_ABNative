@@ -171,8 +171,8 @@ public class NativeApp
     }
 
     public void loadWebView(Activity context, WebView webView,
-            String devUri, String extraUri, boolean debug,
-            AfterInitWebViewCallback afterInitWebViewCallback)
+            WebViewClient webViewClient, String devUri, String extraUri,
+            boolean debug, AfterInitWebViewCallback afterInitWebViewCallback)
     {
         NativeApp.GetCallHandler().post(() -> {
             this.lock.lock();
@@ -184,8 +184,7 @@ public class NativeApp
                         WebView.setWebContentsDebuggingEnabled(true);
                 }
 
-                WebViewClient webClient = new WebViewClient();
-                webView.setWebViewClient(webClient);
+                webView.setWebViewClient(webViewClient);
 
                 if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.KITKAT)
                     webView.setLayerType(View.LAYER_TYPE_HARDWARE, null);
@@ -223,9 +222,8 @@ public class NativeApp
                             .replace("{{debug}}", debug_Str);
 
                     webView.loadDataWithBaseURL(
-                            "file:///android_asset/web-app/zaswiadczenia/" +
-                            extraUri, index, "text/html",
-                            "UTF-8",
+                            "file:///android_asset/web-app/" + extraUri,
+                            index, "text/html", "UTF-8",
                             "/android_asset/web-app/" + extraUri);
                 }
 
