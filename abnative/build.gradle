@@ -2,10 +2,10 @@ apply plugin: 'com.android.library'
 
 android {
 	namespace "pl.allblue.abnative"
-    compileSdkVersion 34
+    compileSdk 34
 
     defaultConfig {
-        minSdkVersion 23
+        minSdkVersion 24
         targetSdkVersion 34
 
         testInstrumentationRunner "androidx.test.runner.AndroidJUnitRunner"
