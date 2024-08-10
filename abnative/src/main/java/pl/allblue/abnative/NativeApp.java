@@ -157,24 +157,21 @@ public class NativeApp
         return this.actionsSets.get(actionsSetName);
     }
 
-    public void init() {
-        NativeApp.GetCallHandler().post(() -> {
-            this.lock.lock();
-            this.initialized = true;
+//    public void init() {
+//        NativeApp.GetCallHandler().post(() -> {
+//            this.lock.lock();
+//            this.initialized = true;
+//            this.lock.unlock();
+//        });
+//    }
 
-            this.webView.addJavascriptInterface(this, "abNative_Android");
-
-            this.lock.unlock();
-        });
-    }
-
-    public void loadWebView(Activity context, WebView webView,
+    public void init(Activity context, WebView webView,
             WebViewClient webViewClient, String devUri, String extraUri,
             boolean debug, AfterInitWebViewCallback afterInitWebViewCallback)
     {
         NativeApp.GetCallHandler().post(() -> {
             this.lock.lock();
-
+            this.initialized = true;
             this.webView = webView;
 
 //            context.runOnUiThread(() -> {
@@ -183,6 +180,8 @@ public class NativeApp
                     if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.KITKAT)
                         WebView.setWebContentsDebuggingEnabled(true);
                 }
+
+                webView.addJavascriptInterface(this, "abNative_Android");
 
                 webView.setWebViewClient(webViewClient);
 
