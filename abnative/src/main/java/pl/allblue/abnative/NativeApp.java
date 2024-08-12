@@ -165,7 +165,7 @@ public class NativeApp
 //        });
 //    }
 
-    public void init(Activity context, WebView webView,
+    public void init(Context context, WebView webView,
             WebViewClient webViewClient, String devUri, String extraUri,
             boolean debug, AfterInitWebViewCallback afterInitWebViewCallback)
     {
