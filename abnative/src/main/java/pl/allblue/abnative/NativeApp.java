@@ -357,6 +357,7 @@ public class NativeApp
             onWebResultCallback.onError(error);
             onWebResultCallbacks.remove(actionId);
             lock.unlock();
+            return;
         }
 
         JSONObject result = null;
