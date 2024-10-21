@@ -1,6 +1,5 @@
 package pl.allblue.abnative;
 
-import android.app.Activity;
 import android.content.Context;
 import android.os.Build;
 import android.os.Handler;
@@ -23,7 +22,6 @@ import java.io.BufferedReader;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.InputStreamReader;
-import java.lang.annotation.Native;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.Map;
@@ -37,8 +35,7 @@ public class NativeApp
 //    static private HandlerThread CallHandler_Thread = null;
 
 
-    static public Handler GetCallHandler()
-    {
+    static public Handler GetCallHandler() {
         if (NativeApp.CallHandler == null) {
 //            NativeApp.CallHandler_Thread = new HandlerThread("NativeApp");
 //            NativeApp.CallHandler_Thread.start();
@@ -51,8 +48,7 @@ public class NativeApp
         return NativeApp.CallHandler;
     }
 
-    static private String GetStringFromFile(Context context, String assetFilePath)
-    {
+    static private String GetStringFromFile(Context context, String assetFilePath) {
         try {
             InputStream is = context.getAssets().open(assetFilePath);
             BufferedReader reader = new BufferedReader(new InputStreamReader(is));
@@ -69,109 +65,122 @@ public class NativeApp
         }
     }
 
-    private Lock lock = new ReentrantLock();
+    private Lock lock;
 
     private HandlerThread handler_Thread = null;
     private Handler handler = null;
 
     private WebView webView = null;
-    private boolean initialized = false;
-    private Map<String, ActionsSet> actionsSets = new HashMap<>();
-    private Map<Integer, OnWebResultInfo> onWebResultInfos = new ArrayMap<>();
+    private boolean initialized;
+    private Map<String, ActionsSet> actionsSets;
+    private Map<Integer, OnWebResultCallback> onWebResultCallbacks;
 
-    private int web_ActionId_Last = 0;
+    private int web_ActionId_Next;
 
-    private ArrayList<WebCall> webView_Init_WebCalls = new ArrayList<>();
-    private boolean webView_Initialized = false;
+    private ArrayList<WebCall> webView_Init_WebCalls;
+    private boolean webView_Initialized;
 
-    public NativeApp()
-    {
-        this.web_ActionId_Last = 0;
-//        this.onWebResultInfos = ;
+    public NativeApp() {
+        lock = new ReentrantLock();
+
+        initialized = false;
+        actionsSets = new HashMap<>();
+        this.onWebResultCallbacks = new ArrayMap<>();
+        this.web_ActionId_Next = 0;
+        webView_Init_WebCalls = new ArrayList<>();
+        webView_Initialized = false;
     }
 
-    public void addActionsSet(String actionsSetName, ActionsSet actionsSet)
-    {
-        this.lock.lock();
+    public void addActionsSet(String actionsSetName, ActionsSet actionsSet) {
+        lock.lock();
 
-        if (this.initialized) {
+        if (initialized) {
             throw new AssertionError(
                     "Cannot add action set after initialization.");
         }
 
-        this.lock.unlock();
-
-        this.actionsSets.put(actionsSetName, actionsSet);
+        actionsSets.put(actionsSetName, actionsSet);
+        lock.unlock();
     }
 
     public void callWeb(final String actionsSetName, final String actionName,
-            final JSONObject args, OnWebResultCallback onWebResultCallback)
-    {
-        NativeApp.GetCallHandler().post(() -> {
-            this.lock.lock();
+            final JSONObject args, OnWebResultCallback onWebResultCallback) {
+        GetCallHandler().post(() -> {
+            lock.lock();
 
-            if (!this.webView_Initialized) {
-                Log.d("NativeApp", "Adding action to stack.");
-
-                this.webView_Init_WebCalls.add(new WebCall(actionsSetName, actionName, args,
+            if (!webView_Initialized) {
+                webView_Init_WebCalls.add(new WebCall(actionsSetName, actionName, args,
                         onWebResultCallback));
-                this.lock.unlock();
+                lock.unlock();
                 return;
             }
 
-            this.lock.unlock();
-
             final NativeApp self = this;
 
-            final int actionId = ++this.web_ActionId_Last;
-            this.onWebResultInfos.put(actionId,
-                    new OnWebResultInfo(onWebResultCallback));
+            final int actionId = this.web_ActionId_Next;
+            this.web_ActionId_Next++;
 
+            this.onWebResultCallbacks.put(actionId, onWebResultCallback);
 
-            this.webView.post(() -> {
-                String args_Str = args == null ? "null" : args.toString();
-                self.webView.evaluateJavascript("abNative.callWeb(" +
-                        Integer.toString(actionId) + ", \"" + actionsSetName + "\", \"" +
-                        actionName + "\", " + args_Str + ")", new ValueCallback<String>() {
-                    @Override
-                    public void onReceiveValue(String s) {
-                        // Do nothing. Maybe check for success in the future.
-                    }
-                });
-            });
+            String args_Str = args == null ? "null" : args.toString();
+            evaluateJavascript("abNative.callWeb(" +
+                    actionId + ", \"" + actionsSetName + "\", \"" +
+                    actionName + "\", " + args_Str + ")");
+            lock.unlock();
         });
     }
 
-    public void errorNative(final String message)
-    {
-        NativeApp.GetCallHandler().post(() -> {
-            this.webView.evaluateJavascript("abNative.errorNative(\"" +
-                    message + "\")", (String s) -> {
-                // Do nothing. Maybe check for success in the future.
-            });
+    public void callWeb(final String actionsSetName, final String actionName,
+            OnWebResultCallback onWebResultCallback) {
+        callWeb(actionsSetName, actionName, null, onWebResultCallback);
+    }
+
+    public void errorNative(final String message) {
+        evaluateJavascript("abNative.errorNative(\"" +
+                message + "\")");
+    }
+
+    public void errorNative_Post(final String message) {
+        evaluateJavascript_Post("abNative.errorNative(\"" +
+                message + "\")");
+    }
+
+    public void evaluateJavascript(String script) {
+        webView.evaluateJavascript(script, (String s) -> {
+            // Do nothing. Maybe check for success in the future.
         });
     }
 
-    public ActionsSet getActionsSet(String actionsSetName)
-    {
-        return this.actionsSets.get(actionsSetName);
+    public void evaluateJavascript_Post(String script, boolean unlock) {
+        GetCallHandler().post(() -> {
+            evaluateJavascript(script);
+            if (unlock)
+                lock.unlock();
+        });
+    }
+
+    public void evaluateJavascript_Post(String script) {
+        evaluateJavascript_Post(script, false);
+    }
+
+    public ActionsSet getActionsSet(String actionsSetName) {
+        return actionsSets.get(actionsSetName);
     }
 
 //    public void init() {
 //        NativeApp.GetCallHandler().post(() -> {
-//            this.lock.lock();
-//            this.initialized = true;
-//            this.lock.unlock();
+//            lock.lock();
+//            initialized = true;
+//            lock.unlock();
 //        });
 //    }
 
     public void init(Context context, WebView webView,
             WebViewClient webViewClient, String devUri, String extraUri,
-            boolean debug, AfterInitWebViewCallback afterInitWebViewCallback)
-    {
-        NativeApp.GetCallHandler().post(() -> {
-            this.lock.lock();
-            this.initialized = true;
+            boolean debug, AfterInitWebViewCallback afterInitWebViewCallback) {
+        GetCallHandler().post(() -> {
+            lock.lock();
+            initialized = true;
             this.webView = webView;
 
 //            context.runOnUiThread(() -> {
@@ -229,147 +238,165 @@ public class NativeApp
                 if (afterInitWebViewCallback != null)
                     afterInitWebViewCallback.afterInitWebView();
 
-            this.lock.unlock();
-
-//            });
+            lock.unlock();
         });
     }
 
     @JavascriptInterface
-    public void callNative(final int actionId, String actionsSetName, String actionName,
-            String argsString)
-    {
+    public void callNative(final int actionId, String actionsSetName,
+            String actionName, String argsString) {
         final NativeApp self = this;
+        GetCallHandler().post(() -> {
+            lock.lock();
 
-        JSONObject args = null;
-        if (argsString != null) {
-            try {
-                args = new JSONObject(argsString);
-            } catch (JSONException e) {
-                Log.e("NativeApp", "Cannot parse 'argString'.", e);
-                this.errorNative("Cannot parser 'argString': " + e.getMessage());
+            JSONObject args = null;
+            if (argsString != null) {
+                try {
+                    args = new JSONObject(argsString);
+                } catch (JSONException e) {
+                    evaluateJavascript_Post(
+                            "abNative.onNativeResult(" +
+                                    actionId + ",null, \"Cannot parse 'argString': " +
+                                    e.getMessage() + "\", null)", true);
+                    lock.unlock();
+                    return;
+                }
+            }
+
+            ActionsSet actionsSet = this.getActionsSet(actionsSetName);
+            if (actionsSet == null) {
+                evaluateJavascript("abNative.onNativeResult(" +
+                        actionId + ",null, \"ActionsSet '" + actionsSetName +
+                        "' not implemented.\")");
+                lock.unlock();
                 return;
             }
-        }
+            Pair<NativeAction, NativeActionCallback> actionPair =
+                    actionsSet.getNative(actionName);
 
-        ActionsSet actionsSet = this.getActionsSet(actionsSetName);
-        if (actionsSet == null) {
-            Log.e("NativeApp", "ActionsSet '" + actionsSetName +
-                    "' does not exist.");
-            this.errorNative("ActionsSet '" + actionsSetName + "' not implemented.");
-            return;
-        }
-        Pair<NativeAction, NativeActionCallback> actionPair =
-                actionsSet.getNative(actionName);
-
-        if (actionPair == null) {
-            Log.e("NativeApp", "Action '" + actionsSetName + ":" +
-                    actionName + " not implemented.");
-            this.errorNative("Action '" + actionsSetName + ":" +
-                    actionName + " not implemented.");
-            return;
-        }
-
-        /* Action Call */
-        if (actionPair.first != null) {
-            final JSONObject result;
-            try {
-                result = actionPair.first.call(args);
-            } catch (Exception e) {
-                Log.e("NativeApp", "JSONException when calling '" +
-                        actionsSetName + ":" + actionName + ".", e);
-                this.errorNative("JSONException when calling '" + actionsSetName + ":" + actionName + ".");
+            if (actionPair == null) {
+                evaluateJavascript("abNative.onNativeResult(" +
+                        actionId + ",null, \"Action '" + actionsSetName +
+                        ":" + actionName + "' not implemented.\")");
+                lock.unlock();
                 return;
             }
 
-           NativeApp.GetCallHandler().post(() -> {
+            /* Action Call */
+            if (actionPair.first != null) {
+                final JSONObject result;
+                try {
+                    result = actionPair.first.call(args);
+                } catch (Exception e) {
+                    evaluateJavascript(
+                            "abNative.onNativeResult(" +
+                                    actionId + ",null, \"Exception when calling '\""
+                                    + actionsSetName + ":" + actionName + "': " +
+                                    e + "\")");
+                    lock.unlock();
+                    return;
+                }
+
                 String result_String = result == null ?
                         "null" : result.toString();
 
-                this.webView.evaluateJavascript("abNative.onNativeResult(" +
-                        actionId + "," + result_String + ")", (String s) -> {
-                    // Do nothing. Maybe check for success in the future.
-                });
-            });
-        /* Action Callback */
-        } else if (actionPair.second != null) {
-            try {
-                actionPair.second.call(args, new ActionResultCallback() {
-                    @Override
-                    public void onResult(JSONObject result) {
-                        NativeApp.GetCallHandler().post(() -> {
+                evaluateJavascript("abNative.onNativeResult(" +
+                        actionId + "," + result_String + ", null)");
+                lock.unlock();
+                /* Action Callback */
+            } else if (actionPair.second != null) {
+                try {
+                    actionPair.second.call(args, new ActionResultCallback() {
+                        @Override
+                        public void onResult(JSONObject result) {
                             String result_String = result == null ?
                                     "null" : result.toString();
 
-                            self.webView.evaluateJavascript(
+                            evaluateJavascript_Post(
                                     "abNative.onNativeResult(" +
-                                    actionId + "," + result_String + ")",
-                                    (String s) -> {
-                                // Do nothing. Maybe check for success in the future.
-                            });
-                        });
-                    }
+                                            actionId + "," + result_String + ", null)",
+                                    true);
+                        }
 
-                    @Override
-                    public void onError(Exception e) {
-                        Log.e("NativeApp", "Exception when calling '" +
-                                actionsSetName + ":" + actionName + ".", e);
-                        self.errorNative("Exception when calling '" + actionsSetName +
-                                ":" + actionName + ".");
-                    }
-                });
-            } catch (Exception e) {
-                Log.e("NativeApp", "Exception when calling '" +
-                        actionsSetName + ":" + actionName + ".", e);
-                this.errorNative("Exception when calling '" + actionsSetName +
-                        ":" + actionName + ".");
-                return;
+                        @Override
+                        public void onError(Exception e) {
+                            evaluateJavascript_Post(
+                                    "abNative.onNativeResult(" +
+                                            actionId + ",null, \"Exception when calling '\""
+                                            + actionsSetName + ":" + actionName + "': " +
+                                            e + "\")", true);
+                        }
+                    });
+                } catch (Exception e) {
+                    evaluateJavascript(
+                            "abNative.onNativeResult(" +
+                                    actionId + ",null, \"Exception when calling '\""
+                                    + actionsSetName + ":" + actionName + "': " +
+                                    e + "\")");
+                    lock.unlock();
+                }
+            } else {
+                throw new AssertionError("Action pair is empty.");
             }
-        } else {
-            throw new AssertionError("Action pair os empty.");
-        }
+        });
     }
 
     @JavascriptInterface
-    public void onWebResult(int actionId, String resultString)
-    {
+    public void onWebResult(int actionId, String resultString, String error) {
+        lock.lock();
+        if (!this.onWebResultCallbacks.containsKey(actionId)) {
+            Log.e("NativeApp", "Cannot find action id '" + actionId +
+                    "'.");
+            lock.unlock();
+            return;
+        }
+        OnWebResultCallback onWebResultCallback = this.onWebResultCallbacks
+                .get(actionId);
+
+        if (error != null) {
+            onWebResultCallback.onError(error);
+            onWebResultCallbacks.remove(actionId);
+            lock.unlock();
+        }
+
         JSONObject result = null;
         try {
             if (resultString != null)
                 result = new JSONObject(resultString);
         } catch (JSONException e) {
-            Log.e("NativeApp", "Cannot parse 'resultString'.", e);
+            onWebResultCallback.onError("Cannot parse result json: " + e);
+            onWebResultCallbacks.remove(actionId);
+            lock.unlock();
             return;
         }
 
-        OnWebResultInfo onWebResultInfo = this.onWebResultInfos.get(actionId);
-        if (onWebResultInfo.callback != null) {
+        if (onWebResultCallback != null) {
             try {
-                onWebResultInfo.callback.call(result);
+                onWebResultCallback.onResult(result);
             } catch (JSONException e) {
-                Log.e("NativeApp", "Cannot read json result.", e);
-                return;
+                onWebResultCallback.onError("Cannot read json result: " + e);
             }
         }
-        this.onWebResultInfos.remove(actionId);
+
+        onWebResultCallbacks.remove(actionId);
+        lock.unlock();
     }
 
     @JavascriptInterface
-    public void webViewInitialized()
-    {
+    public void webViewInitialized() {
+        lock.lock();
+
         Log.d("NativeApp", "Web view initialized.");
 
-        this.lock.lock();
+        webView_Initialized = true;
 
-        this.webView_Initialized = true;
-
-        this.lock.unlock();
+        lock.unlock();
 
         Log.d("NativeApp", "Calling action stack: " +
-                this.webView_Init_WebCalls.size());
+                webView_Init_WebCalls.size());
 
-        for (int i = 0; i < this.webView_Init_WebCalls.size(); i++) {
-            WebCall wc = this.webView_Init_WebCalls.get(i);
+        for (int i = 0; i < webView_Init_WebCalls.size(); i++) {
+            WebCall wc = webView_Init_WebCalls.get(i);
 
             this.callWeb(wc.actionsSetName, wc.actionName, wc.args,
                     wc.onWebResultCallback);
@@ -377,14 +404,12 @@ public class NativeApp
     }
 
 
-    public interface AfterInitWebViewCallback
-    {
+    public interface AfterInitWebViewCallback {
         void afterInitWebView();
     }
 
 
-    private class WebCall
-    {
+    private class WebCall {
 
         public String actionsSetName = null;
         public String actionName = null;

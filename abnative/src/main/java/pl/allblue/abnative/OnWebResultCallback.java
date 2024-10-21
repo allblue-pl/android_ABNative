@@ -6,6 +6,7 @@ import org.json.JSONObject;
 public interface OnWebResultCallback
 {
 
-    void call(JSONObject result) throws JSONException;
+    void onResult(JSONObject result) throws JSONException;
+    void onError(String error);
 
 }

@@ -9,16 +9,14 @@ public class NativeActionsSet
     private String name = null;
     private ActionsSet actionsSet = null;
 
-    public NativeActionsSet(NativeApp nativeApp, String actionsSetName, ActionsSet actionsSet)
-    {
+    public NativeActionsSet(NativeApp nativeApp, String actionsSetName, ActionsSet actionsSet) {
         this.nativeApp = nativeApp;
         this.name = actionsSetName;
         this.actionsSet = actionsSet;
     }
 
     public void callWeb(String actionName, JSONObject args,
-            OnWebResultCallback onWebResult)
-    {
+            OnWebResultCallback onWebResult) {
         this.nativeApp.callWeb(this.name, actionName, args, onWebResult);
     }
 
