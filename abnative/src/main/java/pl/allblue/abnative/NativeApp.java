@@ -290,8 +290,8 @@ public class NativeApp
                 } catch (Exception e) {
                     evaluateJavascript(
                             "abNative.onNativeResult(" +
-                                    actionId + ",null, \"Exception when calling '\""
-                                    + actionsSetName + ":" + actionName + "': " +
+                                    actionId + ",null, \"Exception when calling '"
+                                    + actionsSetName + ":" + actionName + "' -> " +
                                     e + "\")");
                     lock.unlock();
                     return;
@@ -322,16 +322,16 @@ public class NativeApp
                         public void onError(Exception e) {
                             evaluateJavascript_Post(
                                     "abNative.onNativeResult(" +
-                                            actionId + ",null, \"Exception when calling '\""
-                                            + actionsSetName + ":" + actionName + "': " +
+                                            actionId + ",null, \"Exception when calling '"
+                                            + actionsSetName + ":" + actionName + "' -> " +
                                             e + "\")", true);
                         }
                     });
                 } catch (Exception e) {
                     evaluateJavascript(
                             "abNative.onNativeResult(" +
-                                    actionId + ",null, \"Exception when calling '\""
-                                    + actionsSetName + ":" + actionName + "': " +
+                                    actionId + ",null, \"Exception when calling '"
+                                    + actionsSetName + ":" + actionName + "' -> " +
                                     e + "\")");
                     lock.unlock();
                 }
