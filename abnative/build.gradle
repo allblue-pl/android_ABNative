@@ -2,11 +2,10 @@ apply plugin: 'com.android.library'
 
 android {
 	namespace "pl.allblue.abnative"
-    compileSdk 34
+    compileSdk 35
 
     defaultConfig {
-        minSdkVersion 24
-        targetSdkVersion 34
+        minSdk 24
 
         testInstrumentationRunner "androidx.test.runner.AndroidJUnitRunner"
         consumerProguardFiles 'consumer-rules.pro'
