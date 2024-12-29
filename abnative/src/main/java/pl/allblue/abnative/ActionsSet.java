@@ -15,14 +15,14 @@ public class ActionsSet
     }
 
     public ActionsSet addNative(String actionName, NativeAction action) {
-        this.actions_Native.put(actionName, new Pair(action, null));
+        this.actions_Native.put(actionName, new Pair<>(action, null));
 
         return this;
     }
 
     public ActionsSet addNativeCallback(String actionName,
             NativeActionCallback actionCallback) {
-        this.actions_Native.put(actionName, new Pair(null, actionCallback));
+        this.actions_Native.put(actionName, new Pair<>(null, actionCallback));
 
         return this;
     }
