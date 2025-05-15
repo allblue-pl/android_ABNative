@@ -254,7 +254,7 @@ public class NativeApp
                     evaluateJavascript_Post(
                             "abNative.onNativeResult(" +
                                     actionId + ",null, \"Cannot parse 'argString': " +
-                                    e.getMessage() + "\", null)", true);
+                                    this.escapeJSString(e.getMessage()) + "\", null)", true);
                     lock.unlock();
                     return;
                 }
@@ -321,7 +321,7 @@ public class NativeApp
                                     "abNative.onNativeResult(" +
                                             actionId + ",null, \"Exception when calling '"
                                             + actionsSetName + ":" + actionName + "' -> " +
-                                            e + "\")", true);
+                                            escapeJSString(e.getMessage()) + "\")", true);
                         }
                     });
                 } catch (Exception e) {
@@ -329,7 +329,7 @@ public class NativeApp
                             "abNative.onNativeResult(" +
                                     actionId + ",null, \"Exception when calling '"
                                     + actionsSetName + ":" + actionName + "' -> " +
-                                    e + "\")");
+                                    escapeJSString(e.getMessage()) + "\")");
                     lock.unlock();
                 }
             } else {
@@ -404,6 +404,10 @@ public class NativeApp
 
     public interface AfterInitWebViewCallback {
         void afterInitWebView();
+    }
+
+    private String escapeJSString(String str) {
+        return str.replace("\"", "\\\"");
     }
 
 
