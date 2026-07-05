@@ -4,7 +4,7 @@ plugins {
 
 android {
     namespace = "pl.allblue.abnative"
-    compileSdk = 36
+    compileSdk = 37
 
     defaultConfig {
         minSdk = 26
