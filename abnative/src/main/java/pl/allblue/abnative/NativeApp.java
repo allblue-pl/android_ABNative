@@ -196,9 +196,15 @@ public class NativeApp
 
                 webView.setLayerType(View.LAYER_TYPE_HARDWARE, null);
 
-                webView.getSettings().setCacheMode(WebSettings.LOAD_NO_CACHE);
-                webView.getSettings().setJavaScriptEnabled(true);
-                webView.getSettings().setMediaPlaybackRequiresUserGesture(false);
+                WebSettings webSettings = webView.getSettings();
+
+                webSettings.setCacheMode(WebSettings.LOAD_NO_CACHE);
+                webSettings.setJavaScriptEnabled(true);
+                webSettings.setMediaPlaybackRequiresUserGesture(false);
+
+                webSettings.setAllowFileAccess(true);
+                webSettings.setAllowContentAccess(true);
+                webSettings.setAllowFileAccessFromFileURLs(true);
 
                 if (devUri != null) {
                     Log.d("NativeApp", "Debugging on: " + devUri);
